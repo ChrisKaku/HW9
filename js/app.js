@@ -121,6 +121,19 @@ class KnowledgeApp {
     this.renderSidebarTree();
     this.bindEvents();
     this.handleRouting();
+
+    // 若 KaTeX 稍微延遲載入完成，自動為當前頁面重新渲染公式
+    if (typeof katex === "undefined") {
+      const checkKatex = setInterval(() => {
+        if (typeof katex !== "undefined") {
+          clearInterval(checkKatex);
+          if (this.currentSlug) {
+            this.loadNote(this.currentSlug);
+          }
+        }
+      }, 200);
+      setTimeout(() => clearInterval(checkKatex), 6000);
+    }
   }
 
   initElements() {
@@ -253,16 +266,16 @@ class KnowledgeApp {
     const mathTokens = [];
     let text = markdownRaw;
 
-    // 1. 保護獨立區塊公式 $$ ... $$
+    // 1. 保護獨立區塊公式 $$ ... $$ (使用純英數 Token 避免 Markdown 解析器視為強調語法)
     text = text.replace(/\$\$([\s\S]*?)\$\$/g, (m, latex) => {
-      const id = `___MATH_BLOCK_${mathTokens.length}___`;
+      const id = `KTXBLOCK${mathTokens.length}TOKEN`;
       mathTokens.push({ id, latex: latex.trim(), display: true });
-      return id;
+      return `\n\n${id}\n\n`;
     });
 
     // 2. 保護行內公式 $ ... $
     text = text.replace(/\$([^\$\n\r]+?)\$/g, (m, latex) => {
-      const id = `___MATH_INLINE_${mathTokens.length}___`;
+      const id = `KTXINLINE${mathTokens.length}TOKEN`;
       mathTokens.push({ id, latex: latex.trim(), display: false });
       return id;
     });
@@ -286,16 +299,18 @@ class KnowledgeApp {
             throwOnError: false
           });
         } else {
-          katexHtml = token.display ? `$$${token.latex}$$` : `$${token.latex}$`;
+          katexHtml = token.display ? `<div class="katex-fallback">$$${token.latex}$$</div>` : `<span class="katex-fallback">$${token.latex}$</span>`;
         }
       } catch (e) {
         katexHtml = `<span style="color:red">[Math error: ${token.latex}]</span>`;
       }
 
       if (token.display) {
-        html = html.replace(`<p>${token.id}</p>`, `<div class="katex-display-wrapper">${katexHtml}</div>`);
+        const pRegex = new RegExp(`<p>\\s*${token.id}\\s*<\\/p>`, "g");
+        html = html.replace(pRegex, () => `<div class="katex-display-wrapper">${katexHtml}</div>`);
       }
-      html = html.replace(new RegExp(token.id, "g"), katexHtml);
+      // 使用函式回傳值替換，避免 LaTeX 內包含之 $ 符號被 JS replace 誤認為特殊變數 ($1, $& 等)
+      html = html.replace(new RegExp(token.id, "g"), () => katexHtml);
     });
 
     return html;
