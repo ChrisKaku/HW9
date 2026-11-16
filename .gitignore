@@ -1,0 +1,21 @@
+# OS metadata
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor directories and files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Node / dependencies (if any added in future)
+node_modules/
+npm-debug.log*
+
+# Python cache
+__pycache__/
+*.py[cod]
