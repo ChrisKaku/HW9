@@ -302,16 +302,21 @@ class KnowledgeApp {
   }
 
   // 載入與渲染特定筆記檔案
-  async loadNote(slug) {
+  async loadNote(rawSlug) {
+    const slug = (rawSlug || "docs/index.md").replace(/\\/g, "/");
     this.currentSlug = slug;
     this.updateActiveSidebarLink();
     this.contentBody.innerHTML = `<div style="text-align:center; padding: 4rem; color: var(--text-muted);">正在載入知識點筆記...</div>`;
 
     let markdown = "";
     const store = (typeof window !== "undefined" && window.EMBEDDED_NOTES_STORE) ? window.EMBEDDED_NOTES_STORE : EMBEDDED_NOTES_STORE;
+    const getFromStore = (k) => {
+      if (!store) return null;
+      return store[k] || store[k.replace(/\//g, "\\")] || store[k.replace(/\\/g, "/")];
+    };
 
-    if (window.location.protocol === "file:" && store && store[slug]) {
-      markdown = store[slug];
+    if (window.location.protocol === "file:") {
+      markdown = getFromStore(slug);
     } else {
       try {
         const res = await fetch(slug);
@@ -321,13 +326,12 @@ class KnowledgeApp {
           throw new Error(`HTTP ${res.status}`);
         }
       } catch (e) {
-        // 支援本地備份字典或預設內容
-        if (store && store[slug]) {
-          markdown = store[slug];
-        } else {
-          markdown = `# 載入提示\n\n目前檢視檔案：\`${slug}\`\n\n> 本檔案尚在整理中，已在 \`docs/\` 目錄規劃架構，可隨時依據 \`agent.md\` 規範填入知識點。`;
-        }
+        markdown = getFromStore(slug);
       }
+    }
+
+    if (!markdown) {
+      markdown = getFromStore(slug) || `# 載入提示\n\n目前檢視檔案：\`${slug}\`\n\n> 本檔案尚在整理中，已在 \`docs/\` 目錄規劃架構，可隨時依據 \`agent.md\` 規範填入知識點。`;
     }
 
     const { frontmatter, content } = this.parseFrontmatter(markdown);
